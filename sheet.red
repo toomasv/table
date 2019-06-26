@@ -2,6 +2,7 @@ Red [
 	Description: {Nano spreadsheet}
 	Date: 12-Jun-2019
 	Author: "Toomas Vooglaid"
+	Licence: "MIT"
 ]
 context [
 	cells: copy []
