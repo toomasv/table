@@ -307,7 +307,7 @@ e.g. [;Table as main layout
 	files: read %.
 	texts: copy []
 	foreach file files [
-		probe modified: query file 
+		modified: query file 
 		append texts reduce [mold file modified/date rejoin [modified/hour ":" modified/minute]]
 	]
 	tbl: table/only/tight/rows/head texts [[] [center beige] [right]] [silver white] [gray white ["File" "Date" "Time"]]
