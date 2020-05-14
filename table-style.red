@@ -4,21 +4,21 @@ Red [
 	Licence: "Public domain"
 	Description: "Add `table` style to VID. Resulting table is editable"
 	Table-DSL: {
-		data 			    [block!] 	{Block of data to format, if data element is block  
-										it is interpreted as a cell with special format}
+		data                    [block!]    {Obligatory! Block of data to format, if data element is block  
+                                            it is interpreted as a cell with special format}
 		extra [
-			columns clms    [block! integer!] 	{Block of formats for each column or a number of columns}
-		|	size    sz 	    [integer! pair!] 	{Table width if integer (default 700) 
-										 TBD! width_x_height if pair (default max height 2/3rds of screen)}
-		|	head    th 	    [block!]	{Table has head with common format. 
-										(`th` e.g [gray white bold ["Col1" "Col2" [right "Col3"]]])}
-		|	tight 						{Default width is ignored, size is calculated from cells}
-		|	rows    rws 	[block!]	{Block of rotating styles for rows}
-		|	cond    cnd     [block!]	{Conditional format for specific cells, rows or arbitrary conditions}
-			;/default def 	[block! word! integer!]
-		|	lines	bg 	    [tuple! integer! pair! block!]	{Color of inter-cell lines or width of lines 
-										(vertical_x_horizontal if pair!) or both if block!}
-		|	border  pd		[integer! pair!] {Width of table's border (vertical_x_horizontal if pair!)}
+			columns clms    [block! integer!] {Block of formats for each column or a number of columns}
+		|	size    sz      [integer! pair!]  {Table width if integer (default 700) 
+                                            TBD! width_x_height if pair (default max height 2/3rds of screen)}
+		|	head    th      [block!]        {Table has head with common format. 
+                                            (`th` e.g [gray white bold ["Col1" "Col2" [right "Col3"]]])}
+		|	tight                           {Default width is ignored, size is calculated from cells}
+		|	rows    rws     [block!]        {Block of rotating styles for rows}
+		|	cond    cnd     [block!]        {Conditional format for specific cells, rows or arbitrary conditions}
+			;/default def   [block! word! integer!]
+		|	lines	bg      [tuple! integer! pair! block!]	{Color of inter-cell lines or width of lines 
+                                             (vertical_x_horizontal if pair!) or both if block!}
+		|	border  pd      [integer! pair!] {Width of table's border (vertical_x_horizontal if pair!)}
 		]
 	}
 ]
@@ -29,18 +29,18 @@ context [
 	get-size: func [col][either widths/:col [as-pair widths/:col 20][1000x20]]
 
 	dummy: layout/options [
-		_default: 		panel [] 
-		style: 			panel [] 
+		_default:       panel [] 
+		style:          panel [] 
 		special-style: 	panel [] 
 	][visible?: no]
 	edit: function [face][
-		editor/offset: face/offset
-		editor/size: face/size
-		editor/extra: face
-		editor/text: face/text
+		editor/offset:     face/offset
+		editor/size:       face/size
+		editor/extra:      face
+		editor/text:       face/text
 		editor/font/style: face/font/style
-		editor/font/size: face/font/size
-		editor/visible?: yes
+		editor/font/size:  face/font/size
+		editor/visible?:   yes
 		face/parent/parent/selected: editor
 	]
 	extend system/view/VID/styles [
