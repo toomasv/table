@@ -33,12 +33,13 @@ context [
 		style: 			panel [] 
 		special-style: 	panel [] 
 	][visible?: no]
-	edit: func [face][
+	edit: function [face][
 		editor/offset: face/offset
 		editor/size: face/size
 		editor/extra: face
 		editor/text: face/text
-		editor/font: face/font
+		editor/font/style: face/font/style
+		editor/font/size: face/font/size
 		editor/visible?: yes
 		face/parent/parent/selected: editor
 	]
@@ -263,7 +264,7 @@ context [
 			origin (pd) space (ln)
 			(styles) 
 			(body)
-			at 0x0 editor: field hidden ;no-border 
+			at 0x0 editor: field hidden font [];no-border 
 				on-enter [face/visible?: no]
 		] face len-cols
 		
@@ -294,7 +295,7 @@ e.g. [
 	] 
 	view [
 		table data files extra [
-			columns [[left bold] [center 120] center] 
+			columns [[left bold 110] [center 120] center] 
 			head [gray white bold ["File" "Date" "Time"]] 
 			lines 0x1 
 			border 1 
