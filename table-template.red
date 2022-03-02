@@ -75,7 +75,7 @@ tpl: [
 			hscr/page-size: min cols hscr/max-size
 		]
 
-		adjust-size: does [
+		adjust-size: func [/local cum i][
 			rows: min round/ceiling/to size/y / box/y 1  rows-total
 			;cols: min round/ceiling/to size/x / box/x 1  cols-total
 			cols: cols-total
@@ -329,8 +329,12 @@ tpl: [
 			frozen: face/extra/frozen
 			current: face/extra/current
 			row: face/draw/1
-			forall row [if row/1/5/x > event/offset/x [col: index? row break]]
-			face/extra/frozen/:dim: col ;1 + to-integer event/offset/:dim / box/:dim ; How many first visible rows/cols are frozen?
+			face/extra/frozen/:dim: either dim = 'x [
+				forall row [if row/1/5/x > event/offset/x [col: index? row break]]
+				col
+			][
+				1 + to-integer event/offset/:dim / box/:dim ; How many first visible rows/cols are frozen?
+			]
 			frozen/:dim: face/extra/frozen/:dim - frozen/:dim
 			if frozen/:dim > 0 [
 				either dim = 'y [
