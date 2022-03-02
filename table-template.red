@@ -42,9 +42,22 @@ tpl: [
 		filtered: col-sizes: none
 		box: 100x25
 		
-		on-border: func [ofs][
+		on-border: func [face ofs /local cum col][
 			col-sizes: head col-sizes
-			forall col-sizes [if 2 >= absolute col-sizes/1 - ofs [return index? col-sizes]]
+			cum: 0
+			if not empty? frozen-cols [
+				forall frozen-cols [
+					col: frozen-cols/1
+					cum: cum + col-sizes/:col
+					if 2 >= absolute cum - ofs [return index? frozen-cols]
+				]
+			]
+			current: face/extra/current/x
+			repeat i cols [
+				col: current + i
+				cum: cum + col-sizes/:col
+				if 2 >= absolute cum - ofs [return face/extra/frozen/x + i]
+			] 
 			false
 		]
 
@@ -62,15 +75,26 @@ tpl: [
 			hscr/page-size: min cols hscr/max-size
 		]
 
+		adjust-size: does [
+			rows: min round/ceiling/to size/y / box/y 1  rows-total
+			;cols: min round/ceiling/to size/x / box/x 1  cols-total
+			cols: cols-total
+			cum: 0
+			repeat i cols-total [
+				cum: cum + col-sizes/:i
+				if cum >= size/x [cols: i break]
+			]
+		]
+
 		init-grid: func [face /local i][
 			if not empty? data [
 				rows-total: length? data
 				cols-total: length? first data
 				if face/options/auto-index [cols-total: cols-total + 1] ; add auto-index
 				col-sizes: make block! cols-total
-				repeat i cols-total [append col-sizes i * box/x]
-				rows: min round/ceiling/to size/y / box/y 1  rows-total
-				cols: min round/ceiling/to size/x / box/x 1  cols-total
+				append/dup col-sizes box/x cols-total
+				;repeat i cols-total [append col-sizes i * box/x]
+				adjust-size
 				grid: as-pair cols rows
 				frozen-rows: make block! rows
 				frozen-cols: make block! cols
@@ -141,11 +165,16 @@ tpl: [
 			face/extra/current/x: 0 hscr/position: 1
 		]
 
-		fill-cell: function [face cell r x][
+		fill-cell: function [face cell r x /sizes sz0 sz1][
 			cell/9/3: form either face/options/auto-index [
 				either x = 1 [r][c: col-index/(x - 1) data/:r/:c]
 			][
 				data/:r/(col-index/:x)
+			]
+			if sizes [
+				cell/7/x:        cell/4/x: sz0
+				cell/8/x:   -1 + cell/5/x: sz1
+				cell/9/2/x:  4 + sz0
 			]
 		]
 
@@ -154,15 +183,22 @@ tpl: [
 			system/view/auto-sync?: off
 			current: face/extra/current
 			frozen: face/extra/frozen
+			cum: 0
 			if h [
+				foreach col frozen-cols [
+					cum: cum + col-sizes/:col
+				]
 				repeat i frozen/y [
 					r: frozen-rows/:i
 					row: face/draw/:i
 					x: current/x
+					sz0: sz1: cum
 					repeat j cols  [
 						x: x + 1
 						cell: row/(j + frozen/x)
-						fill-cell face cell r x
+						sz1: sz0 + col-sizes/:x
+						fill-cell/sizes face cell r x sz0 sz1
+						sz0: sz1
 					]
 				]
 			]
@@ -180,11 +216,14 @@ tpl: [
 						]
 					]
 					x: current/x
+					sz0: sz1: cum
 					repeat j cols  [
 						x: x + 1
 						cell: row/(j + frozen/x)
 						cell/2: pick [white snow] odd? y
-						fill-cell face cell r x
+						sz1: sz0 + col-sizes/:x
+						fill-cell/sizes face cell r x sz0 sz1
+						sz0: sz1
 					]
 				][;No more data
 					repeat j cols  [
@@ -203,9 +242,10 @@ tpl: [
 			recycle/on
 		]
 
-		get-col-number: function [face event][ ;/only
-			col: 1 + to-integer event/offset/x / box/x 
-			;if not only [col: col + 1]
+		get-col-number: function [face event][ 
+			row: face/draw/1
+			forall row [if row/1/5/x > event/offset/x [col: index? row break]]
+			;col: 1 + to-integer event/offset/x / box/x 
 			either col <= face/extra/frozen/x [
 				frozen-col/:col
 			][
@@ -288,7 +328,9 @@ tpl: [
 		freeze: function [face event dim /extern cols rows][
 			frozen: face/extra/frozen
 			current: face/extra/current
-			face/extra/frozen/:dim: 1 + to-integer event/offset/:dim / box/:dim ; How many first visible rows/cols are frozen?
+			row: face/draw/1
+			forall row [if row/1/5/x > event/offset/x [col: index? row break]]
+			face/extra/frozen/:dim: col ;1 + to-integer event/offset/:dim / box/:dim ; How many first visible rows/cols are frozen?
 			frozen/:dim: face/extra/frozen/:dim - frozen/:dim
 			if frozen/:dim > 0 [
 				either dim = 'y [
@@ -358,7 +400,7 @@ tpl: [
 					]
 					true [
 						scroll/h face hscr/position: 
-							min hscr/max-size - cols + 1 
+							min hscr/max-size - cols + 1
 								max face/extra/frozen/x + face/extra/tmp/x + 1 
 									switch event/key [
 										;track [probe 'track]
@@ -383,7 +425,7 @@ tpl: [
 		]
 
 		on-down: func [face event][
-			on-border?: on-border event/offset/x
+			on-border?: on-border face event/offset/x
 		]
 
 		on-over: function [face event][;probe reduce [event/down? on-border?]
@@ -409,11 +451,15 @@ tpl: [
 
 		on-up: function [face event][
 			if on-border? [
-				ofs0: col-sizes/:on-border?
+				ofs0: face/draw/1/:on-border?/4/x
 				ofs1: face/draw/1/:on-border?/5/x
 				df: ofs1 - ofs0
-				sizes: at head col-sizes on-border?
-				forall sizes [sizes/1: sizes/1 + df]
+				col: either on-border? <= col: face/extra/frozen/x [
+					frozen-cols/:col
+				][
+					on-border? - col + face/extra/current/x
+				]
+				col-sizes/:col: df
 			]
 		]
 
@@ -539,43 +585,3 @@ tpl: [
 		]
 	]
 ]
-;leak-check [
-style 'table tpl
-
-;comment [
-file: %data/RV291_29062020120209394.csv  ;annual-enterprise-survey-2020-financial-year-provisional-csv.csv ;
-view/flags/options [  ;/no-wait
-	on-resize [tb/size: face/size - as-pair 20 30 + h/size/y] 
-	on-menu [
-		switch event/picked [
-			open [
-				if file: request-file/title "Open file" [
-					tb/data: file 
-					tb/actors/data: load file ;load/as head clear tmp: find/last read/part file 5000 lf 'csv;
-					tb/actors/init tb face/text: form file
-				]
-			]
-			save []
-		]
-	]
-	below h: h1 "Example Table" tb: table 617x267 data [] ;file ;with [options: [auto-index: #[false]]]
-	react later [
-		face/actors/size: face/size - 17
-		face/actors/rows: round/to face/actors/size/y / 25 1 
-		face/actors/cols: round/to face/actors/size/x / 100 1 
-		;face/actors/rows: min round/ceiling/to size/y / box/y 1  rows-total
-		;face/actors/cols: min round/ceiling/to size/x / box/x 1  cols-total
-		face/actors/init-fill face
-		face/actors/init-indices face
-		face/actors/fill face 
-	]
-	;button [probe tb/options]
-] 'resize [text: form file menu: ["File" ["Open" open "Save" save]]]
-;]
-;]
-;tb/actors/data: load tb/data 
-;tb/actors/init/force tb
-;show tb
-;do-events
-
-
