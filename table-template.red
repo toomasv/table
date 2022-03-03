@@ -10,6 +10,7 @@ tpl: [
 	flags: [scrollable all-over]
 	options: [auto-index: #[true]]
 	extra: make map! [tmp: 0x0 current: 0x0 frozen: 0x0]
+	me: self
 	menu: [
 		"Cell" [
 			;"Freeze"   freeze-cell
@@ -265,7 +266,9 @@ tpl: [
 				y: round/ceiling/to event/offset/y / box/y 1
 				cell: as-pair x y
 			]
-			cell - face/extra/frozen + face/extra/current
+			out: cell - face/extra/frozen + face/extra/current
+			if face/options/auto-index [out/x: out/x - 1]
+			out
 		]
 
 		ask-code: function [][
@@ -278,21 +281,28 @@ tpl: [
 			out
 		]
 		
-		make-editor: func [face][
-			append face/parent/pane layout/only [
+		make-editor: func [table][
+			append table/parent/pane layout/only [
 				at 0x0 tbl-editor: field hidden on-enter [
-					local [idx]
+					;local [idx]
 					face/visible?: no 
+					switch type?/word e: face/extra [
+						pair! [
+							;if me/options/auto-index [e/x: e/x - 1]
+							type: type? data/(e/y)/(e/x)
+							data/(e/y)/(e/x): to type face/text
+						]
+						
 					;if idx: indexes/(face/extra) [
 					;	sorting idx face/extra - 1
 					;	if col-idx/selected = face/extra [
 					;		append clear sort-index indexes/(col-idx/selected)
 					;		fill
 					;	]
-					;] 
+					] 
 					;b/draw: b/draw
 				]
-			]
+			] 
 		]
 
 		edit: function [ofs sz txt][
@@ -533,7 +543,7 @@ tpl: [
 			ofs:  as-pair x y                                           ;Draw-cell offset
 			cell: as-pair col round/ceiling/to event/offset/y / box/y 1 ;Draw-cell address
 			addr:  get-data-address/with face event cell
-			either any [not face/options/auto-index addr/x > 1] [                                ;Don't edit autokeys
+			either not all [face/options/auto-index addr/x = 0] [                                ;Don't edit autokeys
 				txt: face/draw/(cell/y)/(cell/x)/9/3
 				tbl-editor/extra: addr                         ;Register cell
 				sz: as-pair col-sizes/(cell/x) box/y
