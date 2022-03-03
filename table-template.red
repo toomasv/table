@@ -35,10 +35,11 @@ tpl: [
 		vscr: hscr: data: down: loaded: size:       ;current: 
 		rows: cols: grid: rows-total: cols-total: 
 		indexes: default-row-index: row-index: current-row-index: 
-		default-col-index: col-index: frozen-rows: frozen-cols: on-border?: none 
-		
-		draw-block: make block! 1000
-		filter-cmd: make block! 10
+		default-col-index: col-index: on-border?: none 
+		frozen-cols: make block! 20
+		frozen-rows: make block! 20
+		draw-block:  make block! 1000
+		filter-cmd:  make block! 10
 		filtered: col-sizes: none
 		box: 100x25
 		
@@ -96,8 +97,8 @@ tpl: [
 				;repeat i cols-total [append col-sizes i * box/x]
 				adjust-size
 				grid: as-pair cols rows
-				frozen-rows: make block! rows
-				frozen-cols: make block! cols
+				clear frozen-rows
+				clear frozen-cols
 			]
 		]
 
@@ -161,8 +162,8 @@ tpl: [
 				either force [init-indices/force face][init-indices face]
 				init-fill face
 			]
-			face/extra/current/y: 0 vscr/position: 1
-			face/extra/current/x: 0 hscr/position: 1
+			face/extra/frozen: face/extra/current: 0x0
+			hscr/position: vscr/position: 1
 		]
 
 		fill-cell: function [face cell r x /sizes sz0 sz1][
@@ -184,10 +185,10 @@ tpl: [
 			current: face/extra/current
 			frozen: face/extra/frozen
 			cum: 0
+			foreach col frozen-cols [
+				cum: cum + col-sizes/:col
+			]
 			if h [
-				foreach col frozen-cols [
-					cum: cum + col-sizes/:col
-				]
 				repeat i frozen/y [
 					r: frozen-rows/:i
 					row: face/draw/:i
@@ -242,9 +243,14 @@ tpl: [
 			recycle/on
 		]
 
-		get-col-number: function [face event][ 
+		get-draw-col: function [face event][
 			row: face/draw/1
 			forall row [if row/1/5/x > event/offset/x [col: index? row break]]
+			col
+		]
+		
+		get-col-number: function [face event][ 
+			col: get-draw-col face event
 			;col: 1 + to-integer event/offset/x / box/x 
 			either col <= face/extra/frozen/x [
 				frozen-col/:col
@@ -328,10 +334,11 @@ tpl: [
 		freeze: function [face event dim /extern cols rows][
 			frozen: face/extra/frozen
 			current: face/extra/current
-			row: face/draw/1
+			;row: face/draw/1
 			face/extra/frozen/:dim: either dim = 'x [
-				forall row [if row/1/5/x > event/offset/x [col: index? row break]]
-				col
+				get-draw-col face event
+				;forall row [if row/1/5/x > event/offset/x [col: index? row break]]
+				;col
 			][
 				1 + to-integer event/offset/:dim / box/:dim ; How many first visible rows/cols are frozen?
 			]
