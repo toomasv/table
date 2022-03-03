@@ -35,7 +35,7 @@ tpl: [
 		vscr: hscr: data: down: loaded: size:       ;current: 
 		rows: cols: grid: rows-total: cols-total: 
 		indexes: default-row-index: row-index: current-row-index: 
-		default-col-index: col-index: on-border?: none 
+		default-col-index: col-index: on-border?: tbl-editor: none 
 		frozen-cols: make block! 20
 		frozen-rows: make block! 20
 		draw-block:  make block! 1000
@@ -259,6 +259,15 @@ tpl: [
 			]
 		]
 
+		get-data-address: function [face event /with cell][
+			if not cell [
+				x: get-draw-col face event
+				y: round/ceiling/to event/offset/y / box/y 1
+				cell: as-pair x y
+			]
+			cell - face/extra/frozen + face/extra/current
+		]
+
 		ask-code: function [][
 			view [
 				below text "Code:" 
@@ -267,6 +276,33 @@ tpl: [
 				button "Cancel" [out: none unview]
 			]
 			out
+		]
+		
+		make-editor: func [face][
+			append face/parent/pane layout/only [
+				at 0x0 tbl-editor: field hidden on-enter [
+					local [idx]
+					face/visible?: no 
+					;if idx: indexes/(face/extra) [
+					;	sorting idx face/extra - 1
+					;	if col-idx/selected = face/extra [
+					;		append clear sort-index indexes/(col-idx/selected)
+					;		fill
+					;	]
+					;] 
+					;b/draw: b/draw
+				]
+			]
+		]
+
+		edit: function [ofs sz txt][
+			win: tbl-editor
+			until [win: win/parent win/type: 'window]
+			tbl-editor/offset:    ofs
+			tbl-editor/size:      sz
+			tbl-editor/text:      txt
+			tbl-editor/visible?:  yes
+			win/selected:         tbl-editor
 		]
 
 		normalize-range: function [range [block!]][
@@ -425,14 +461,22 @@ tpl: [
 			]
 		]
 
-		on-wheel: function [face event][
-			;current: face/extra/current
-			face/extra/current/y: 
-				min vscr/max-size - rows ; rows-total
-					max face/extra/frozen/y + face/extra/tmp/y
-						face/extra/current/y - to-integer (event/picked * either event/ctrl? [rows][3])
-			vscr/position: face/extra/current/y + 1
-			fill face
+		on-wheel: function [face event][;May-be switch shift and ctrl ?
+			either event/shift? [
+				face/extra/current/x: 
+					min hscr/max-size - cols ; rows-total
+						max face/extra/frozen/x + face/extra/tmp/x
+							face/extra/current/x - to-integer (event/picked * either event/ctrl? [cols][1])
+				hscr/position: face/extra/current/x + 1
+				fill/horizontal face true
+			][
+				face/extra/current/y: 
+					min vscr/max-size - rows ; rows-total
+						max face/extra/frozen/y + face/extra/tmp/y
+							face/extra/current/y - to-integer (event/picked * either event/ctrl? [rows][3])
+				vscr/position: face/extra/current/y + 1
+				fill face
+			]
 		]
 
 		on-down: func [face event][
@@ -474,23 +518,29 @@ tpl: [
 			]
 		]
 
-		;on-dbl-click: function [face event /local ofs cell y found txt][
-		;	if editor/visible? [face/draw: face/draw]                ;Update draw in case we edited a field and didn't enter
-		;	ofs: as-pair round/down/to event/offset/x box/x     ;Get cell coordinates
-		;				 round/down/to event/offset/y box/y
-		;	cell: ofs / box                                     ;Get cell address
-		;	either cell/x > 0 [                                ;Don't edit autokeys
-		;		found: find find face/draw as-pair 0 ofs/y 'text  ;Which row do we have? Find autokey (first entry in row)
-		;		either empty? found/3 [
-		;			editor/visible?: no
-		;		][
-		;			y: to-integer found/3                          ;Autokey's value
-		;			txt: data/(y - 1 * (cols - 1) + cell/x)        ;Get original entry from data
-		;			editor/extra/current/y: cell/x + 1                       ;Register column
-		;			edit ofs + 10 txt                              ;Compensate offset for VID space
-		;		]
-		;	][editor/visible?: no]
-		;]
+		on-dbl-click: function [face event][
+			either tbl-editor [
+				if tbl-editor/visible? [
+					;...				;Make sure field is updated according to correct type
+					face/draw: face/draw                ;Update draw in case we edited a field and didn't enter
+				]
+			][
+				make-editor face
+			]
+			row: face/draw/1
+			forall row [if row/1/5/x > event/offset/x [col: index? row x: row/1/4/x break]]
+			y: round/down/to event/offset/y box/y
+			ofs:  as-pair x y                                           ;Draw-cell offset
+			cell: as-pair col round/ceiling/to event/offset/y / box/y 1 ;Draw-cell address
+			addr:  get-data-address/with face event cell
+			either any [not face/options/auto-index addr/x > 1] [                                ;Don't edit autokeys
+				txt: face/draw/(cell/y)/(cell/x)/9/3
+				tbl-editor/extra: addr                         ;Register cell
+				sz: as-pair col-sizes/(cell/x) box/y
+				ofs: face/offset + ofs
+				edit ofs sz txt                              ;Compensate offset for VID space
+			][tbl-editor/visible?: no]
+		]
 		
 		on-created: func [face event][
 			;put get-scroller face 'horizontal 'visible? no
