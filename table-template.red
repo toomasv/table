@@ -15,7 +15,7 @@ tpl: [
 		"Cell" [
 			;"Freeze"   freeze-cell
 			;"Unfreeze" unfreeze-cell
-			;"Edit"     edit-cell
+			"Edit"     edit-cell
 		] 
 		"Row" [
 			"Freeze"   freeze-row
@@ -244,6 +244,16 @@ tpl: [
 			recycle/on
 		]
 
+		get-draw-address: function [face event][
+			col: get-draw-col face event
+			row: round/ceiling/to event/offset/y / box/y 1
+			as-pair col row
+		]
+		
+		get-draw-offset: func [face cell][
+			face/draw/(cell/y)/(cell/x)/4
+		]
+
 		get-draw-col: function [face event][
 			row: face/draw/1
 			forall row [if row/1/5/x > event/offset/x [col: index? row break]]
@@ -252,7 +262,6 @@ tpl: [
 		
 		get-col-number: function [face event][ 
 			col: get-draw-col face event
-			;col: 1 + to-integer event/offset/x / box/x 
 			either col <= face/extra/frozen/x [
 				frozen-col/:col
 			][
@@ -266,6 +275,7 @@ tpl: [
 				y: round/ceiling/to event/offset/y / box/y 1
 				cell: as-pair x y
 			]
+			probe reduce [cell  face/extra/frozen  face/extra/current]
 			out: cell - face/extra/frozen + face/extra/current
 			if face/options/auto-index [out/x: out/x - 1]
 			out
@@ -283,24 +293,52 @@ tpl: [
 		
 		make-editor: func [table][
 			append table/parent/pane layout/only [
-				at 0x0 tbl-editor: field hidden on-enter [
-					;local [idx]
+				at 0x0 tbl-editor: field hidden with [
+					options: [text: none]
+					extra: #()
+				] on-enter [
 					face/visible?: no 
-					switch type?/word e: face/extra [
-						pair! [
-							;if me/options/auto-index [e/x: e/x - 1]
-							type: type? data/(e/y)/(e/x)
-							data/(e/y)/(e/x): to type face/text
+					update-data face 
+				] on-key-down [
+					switch event/key [
+						#"^[" [ ;esc
+							append clear face/text face/options/text
+							face/visible?: no
 						]
-						
-					;if idx: indexes/(face/extra) [
-					;	sorting idx face/extra - 1
-					;	if col-idx/selected = face/extra [
-					;		append clear sort-index indexes/(col-idx/selected)
-					;		fill
-					;	]
-					] 
-					;b/draw: b/draw
+						down  [show-editor face/extra/table none face/extra/draw + 0x1];[either cell/y > (cols + face/extra/frozen)]
+						up    [show-editor face/extra/table none face/extra/draw - 0x1]
+						#"^-" [
+							either find event/flags 'shift [
+								show-editor face/extra/table none face/extra/draw - 1x0
+							][
+								show-editor face/extra/table none face/extra/draw + 1x0
+							]
+						]
+					]
+				] on-focus [
+					face/options/text: copy face/text
+				]
+			] 
+		]
+		
+		show-editor: function [face event cell][
+			addr: get-data-address/with face event cell
+			ofs:  get-draw-offset face cell
+			either not all [face/options/auto-index addr/x = 0] [ ;Don't edit autokeys
+				txt: face/draw/(cell/y)/(cell/x)/9/3
+				tbl-editor/extra/data: addr                       ;Register cell
+				tbl-editor/extra/draw: cell
+				sz: as-pair col-sizes/(cell/x) box/y
+				ofs: face/offset + ofs                            ;Compensate offset for VID space
+				edit ofs sz txt
+			][tbl-editor/visible?: no]
+		]
+		
+		update-data: function [face][
+			switch type?/word e: face/extra/data [
+				pair! [
+					type: type? data/(e/y)/(e/x)
+					data/(e/y)/(e/x): to type face/text
 				]
 			] 
 		]
@@ -528,28 +566,18 @@ tpl: [
 			]
 		]
 
-		on-dbl-click: function [face event][
+		on-dbl-click: function [face event /local e][
 			either tbl-editor [
 				if tbl-editor/visible? [
-					;...				;Make sure field is updated according to correct type
-					face/draw: face/draw                ;Update draw in case we edited a field and didn't enter
+					update-data tbl-editor   ;Make sure field is updated according to correct type
+					face/draw: face/draw     ;Update draw in case we edited a field and didn't enter
 				]
 			][
 				make-editor face
 			]
-			row: face/draw/1
-			forall row [if row/1/5/x > event/offset/x [col: index? row x: row/1/4/x break]]
-			y: round/down/to event/offset/y box/y
-			ofs:  as-pair x y                                           ;Draw-cell offset
-			cell: as-pair col round/ceiling/to event/offset/y / box/y 1 ;Draw-cell address
-			addr:  get-data-address/with face event cell
-			either not all [face/options/auto-index addr/x = 0] [                                ;Don't edit autokeys
-				txt: face/draw/(cell/y)/(cell/x)/9/3
-				tbl-editor/extra: addr                         ;Register cell
-				sz: as-pair col-sizes/(cell/x) box/y
-				ofs: face/offset + ofs
-				edit ofs sz txt                              ;Compensate offset for VID space
-			][tbl-editor/visible?: no]
+			tbl-editor/extra/table: face
+			cell: get-draw-address face event                     ;Draw-cell address
+			show-editor face event cell
 		]
 		
 		on-created: func [face event][
@@ -611,6 +639,8 @@ tpl: [
 		
 		on-menu: function [face event /extern rows cols current-row-index frozen-rows frozen-cols][
 			switch event/picked [
+				edit-cell [on-dbl-click face event]
+			
 				freeze-row   [freeze face event 'y]
 				unfreeze-row [unfreeze face 'y]
 				freeze-col   [freeze face event 'x]
