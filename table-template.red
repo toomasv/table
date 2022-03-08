@@ -36,12 +36,12 @@ tpl: [
 		vscr: hscr: data: down: loaded: size:       ;current: 
 		rows: cols: grid: rows-total: cols-total: 
 		indexes: default-row-index: row-index: current-row-index: 
-		default-col-index: col-index: on-border?: tbl-editor: none 
+		default-col-index: col-index: on-border?: tbl-editor: 
+		filtered: col-sizes: active: anchor: anchor-offset: extra?: none
 		frozen-cols: make block! 20
 		frozen-rows: make block! 20
 		draw-block:  make block! 1000
 		filter-cmd:  make block! 10
-		filtered: col-sizes: none
 		box: 100x25
 		
 		on-border: func [face ofs /local cum col][
@@ -135,7 +135,7 @@ tpl: [
 			repeat i rows [
 				row: make block! cols ;+ 1 ;add index column
 				repeat j cols  [;+ 1
-					cell: make block! 9    ;each column has 9 elements, see below
+					cell: make block! 11    ;each column has 11 elements, see below
 					s: (as-pair j i) - 1 * box
 					text: form either face/options/auto-index [
 						either j = 1 [i][c: col-index/(j - 1) data/:i/:c]
@@ -144,11 +144,11 @@ tpl: [
 					]
 					;Cell structure
 					repend cell [
+						'line-width 1
 						'fill-pen pick [white snow] odd? i
 						'box s s + box
-						'clip s s + box - 1 reduce [
-							'text s + 4x2  text
-						]
+						'clip s s + box - 1 
+						reduce ['text s + 4x2  text]
 					]
 					append/only row cell
 				]
@@ -168,15 +168,15 @@ tpl: [
 		]
 
 		fill-cell: function [face cell r x /sizes sz0 sz1][
-			cell/9/3: form either face/options/auto-index [
+			cell/11/3: form either face/options/auto-index [
 				either x = 1 [r][c: col-index/(x - 1) data/:r/:c]
 			][
 				data/:r/(col-index/:x)
 			]
 			if sizes [
-				cell/7/x:        cell/4/x: sz0
-				cell/8/x:   -1 + cell/5/x: sz1
-				cell/9/2/x:  4 + sz0
+				cell/9/x:         cell/6/x: sz0
+				cell/10/x:   -1 + cell/7/x: sz1
+				cell/11/2/x:  4 + sz0
 			]
 		]
 
@@ -222,15 +222,15 @@ tpl: [
 					repeat j cols  [
 						x: x + 1
 						cell: row/(j + frozen/x)
-						cell/2: pick [white snow] odd? y
+						cell/4: pick [white snow] odd? y
 						sz1: sz0 + col-sizes/:x
 						fill-cell/sizes face cell r x sz0 sz1
 						sz0: sz1
 					]
 				][;No more data
 					repeat j cols  [
-						row/:j/2: silver
-						row/:j/9/3: ""
+						row/:j/4: silver
+						row/:j/11/3: ""
 					]
 				]
 			]
@@ -251,12 +251,12 @@ tpl: [
 		]
 		
 		get-draw-offset: func [face cell][
-			face/draw/(cell/y)/(cell/x)/4
+			copy/part at face/draw/(cell/y)/(cell/x) 6 2
 		]
 
 		get-draw-col: function [face event][
 			row: face/draw/1
-			forall row [if row/1/5/x > event/offset/x [col: index? row break]]
+			forall row [if row/1/7/x > event/offset/x [col: index? row break]]
 			col
 		]
 		
@@ -275,7 +275,6 @@ tpl: [
 				y: round/ceiling/to event/offset/y / box/y 1
 				cell: as-pair x y
 			]
-			probe reduce [cell  face/extra/frozen  face/extra/current]
 			out: cell - face/extra/frozen + face/extra/current
 			if face/options/auto-index [out/x: out/x - 1]
 			out
@@ -325,13 +324,56 @@ tpl: [
 			addr: get-data-address/with face event cell
 			ofs:  get-draw-offset face cell
 			either not all [face/options/auto-index addr/x = 0] [ ;Don't edit autokeys
-				txt: face/draw/(cell/y)/(cell/x)/9/3
+				txt: face/draw/(cell/y)/(cell/x)/11/3
 				tbl-editor/extra/data: addr                       ;Register cell
 				tbl-editor/extra/draw: cell
-				sz: as-pair col-sizes/(cell/x) box/y
-				ofs: face/offset + ofs                            ;Compensate offset for VID space
-				edit ofs sz txt
+				;sz: as-pair col-sizes/(cell/x) box/y
+				fof: face/offset                                  ;Compensate offset for VID space
+				edit fof + ofs/1 ofs/2 - ofs/1 txt
 			][tbl-editor/visible?: no]
+		]
+		
+		hide-editor: does [
+			if all [tbl-editor tbl-editor/visible?] [tbl-editor/visible?: no]
+		]
+		
+		add-extra-mark: func [face ofs][
+			append face/draw compose [line-width 3 fill-pen glass box (ofs)]
+		]
+		
+		set-anchor: func [face cell][
+			anchor: cell
+			anchor-offset: get-draw-offset face anchor
+		]
+		
+		set-new-mark: func [face cell ofs][
+			set-anchor face cell
+			add-extra-mark face ofs
+		]
+		
+		mark-active: func [face cell /extend /extra /local ofs start][
+			ofs: get-draw-offset face cell
+			active: cell
+			either pair? last face/draw [
+				case [
+					extend [
+						start: skip tail face/draw -2
+						start/1: min anchor-offset/1 ofs/1
+						start/2: max anchor-offset/2 ofs/2
+					]
+					extra  [set-new-mark face cell ofs]
+					true   [
+						set-anchor face cell
+						change/part skip tail face/draw -2 ofs 2]
+				]
+			] [set-new-mark face cell ofs]
+		]
+		
+		unmark-active: func [face][
+			if active [
+				clear find/tail/last face/draw block!
+				active: none
+			]
 		]
 		
 		update-data: function [face][
@@ -421,7 +463,7 @@ tpl: [
 			;row: face/draw/1
 			face/extra/frozen/:dim: either dim = 'x [
 				get-draw-col face event
-				;forall row [if row/1/5/x > event/offset/x [col: index? row break]]
+				;forall row [if row/1/7/x > event/offset/x [col: index? row break]]
 				;col
 			][
 				1 + to-integer event/offset/:dim / box/:dim ; How many first visible rows/cols are frozen?
@@ -449,13 +491,13 @@ tpl: [
 				repeat i face/extra/frozen/y [
 					repeat j cols [
 						j: j + face/extra/frozen/x 
-						face/draw/:i/:j/2: 192.192.192
+						face/draw/:i/:j/4: 192.192.192
 					]
 				]
 			][
 				repeat i rows [
 					i: i + face/extra/frozen/y
-					repeat j face/extra/frozen/:dim [face/draw/:i/:j/2: 192.192.192]
+					repeat j face/extra/frozen/:dim [face/draw/:i/:j/4: 192.192.192]
 				]
 			]
 		]
@@ -527,12 +569,29 @@ tpl: [
 			]
 		]
 
-		on-down: func [face event][
-			on-border?: on-border face event/offset/x
+		on-down: func [face event /local cell][
+			set-focus face
+			unless on-border?: on-border face event/offset/x [
+				hide-editor
+				cell: get-draw-address face event
+				case [
+					event/shift? [mark-active/extend face cell]
+					event/ctrl?  [extra?: true mark-active/extra face cell]
+					true [
+						if extra? [unmark-active face  extra?: false] 
+						mark-active face cell
+					]
+				]
+			]
+		]
+		
+		on-unfocus: func [face][
+			hide-editor
+			unmark-active face
 		]
 
 		on-over: function [face event][;probe reduce [event/down? on-border?]
-			box: 5 clip: 8
+			box: 7 clip: 10
 			if all [event/down? on-border?][
 				ofs0: face/draw/1/:on-border?/:box/x
 				ofs1: event/offset/x
@@ -543,7 +602,7 @@ tpl: [
 						if 1 < index? cells [
 							x: cells/-1/:box/x 
 							cells/1/(box - 1)/x: cells/1/(clip - 1)/x: x
-							cells/1/9/2/x: x + 4 ;add text offset
+							cells/1/11/2/x: x + 4 ;add text offset
 						]
 						x: cells/1/:box/x
 						cells/1/:clip/x: -1 + cells/1/:box/x: x + df
@@ -554,8 +613,8 @@ tpl: [
 
 		on-up: function [face event][
 			if on-border? [
-				ofs0: face/draw/1/:on-border?/4/x
-				ofs1: face/draw/1/:on-border?/5/x
+				ofs0: face/draw/1/:on-border?/6/x
+				ofs1: face/draw/1/:on-border?/7/x
 				df: ofs1 - ofs0
 				col: either on-border? <= col: face/extra/frozen/x [
 					frozen-cols/:col
@@ -578,6 +637,25 @@ tpl: [
 			tbl-editor/extra/table: face
 			cell: get-draw-address face event                     ;Draw-cell address
 			show-editor face event cell
+		]
+		
+		on-key-down: func [face event][
+			step: switch event/key [
+				down      [0x1]
+				up        [0x-1]
+				left      [-1x0]
+				right     [1x0]
+				page-up   [as-pair 0 negate rows]
+				page-down [as-pair 0 rows]
+			]
+			if all [active step] [
+				active: active + step
+				either find event/flags 'shift [
+					mark-active/extend face active
+				][
+					mark-active face active
+				]
+			]
 		]
 		
 		on-created: func [face event][
