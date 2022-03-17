@@ -552,21 +552,29 @@ tpl: [
 					] 
 		]
 		
-		on-scroll: func [face event /extern by-key?][;/local key pos1 pos2 dif szx current][
+		on-scroll: function [face event /extern by-key?][;/local key pos1 pos2 dif szx current][
 			key: event/key
 			unless key = 'end [
 				by-key?: false
 				case [
 					key = 'track [
-						;either 
-						pos1: vscr/position
-						pos2: vscr/position: 
-							min vscr/max-size - rows + 1 
-								max face/extra/frozen/y + face/extra/tmp/y + 1 
-									either event/picked > (rows-total / 2) [event/picked + rows][event/picked]
-						dif: pos2 - pos1 * box/y
-						scroll face pos2
-						parse marks [any ['box | s: pair! (s/1/y: s/1/y + dif)]]
+						either event/orientation = 'vertical [
+							dim: 'y scr: vscr steps: rows total: rows-total
+						][
+							dim: 'x scr: hscr steps: cols total: cols-total
+						]
+						pos1: scr/position
+						pos2: scr/position: 
+							min scr/max-size - steps + 1 
+								max face/extra/frozen/:dim + face/extra/tmp/:dim + 1 
+									either event/picked > (total / 2) [event/picked + steps][event/picked]
+						dif: pos2 - pos1 * box/:dim
+						either event/orientation = 'vertical [
+							scroll face pos2
+						][
+							scroll/h face pos2
+						]
+						parse marks [any ['box | s: pair! (s/1/:dim: s/1/:dim + dif)]]
 					]
 					find [up down page-up page-down] key [
 						pos1: vscr/position
@@ -669,7 +677,7 @@ tpl: [
 						event/offset/x >= size/x [
 							pos1: hscr/position
 							scroll/h face pos2: set-scr-pos face 'x 'right
-							probe cell: get-draw-offset face face/extra/frozen + 1
+							cell: get-draw-offset face face/extra/frozen + 1
 							cell: cell/2 - cell/1
 							if pos2 > pos1 [
 								move-anchor 0x-1 cell
