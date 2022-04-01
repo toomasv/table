@@ -493,6 +493,7 @@ tpl: [
 				] on-enter [
 					face/visible?: no 
 					update-data face 
+					set-focus face/extra/table
 				] on-key-down [
 					switch event/key [
 						#"^[" [ ;esc
@@ -519,6 +520,7 @@ tpl: [
 			addr: get-data-address/with face event cell
 			ofs:  get-draw-offset face cell
 			either not all [face/options/auto-index addr/x = 0] [ ;Don't edit autokeys
+				tbl-editor/extra/table: face
 				txt: face/draw/(cell/y)/(cell/x)/11/3
 				tbl-editor/extra/data: addr                       ;Register cell
 				tbl-editor/extra/draw: cell
@@ -1150,7 +1152,7 @@ tpl: [
 			][
 				make-editor face
 			]
-			tbl-editor/extra/table: face
+			;tbl-editor/extra/table: face
 			cell: get-draw-address face event                     ;Draw-cell address
 			show-editor face event cell
 		]
@@ -1165,7 +1167,7 @@ tpl: [
 				page-up   [as-pair 0 negate grid/y]
 				page-down [as-pair 0 grid/y]
 			]
-			if all [active step] [
+			either all [active step] [
 				;by-key?: true  ;?? 
 				;probe reduce [key step ofs: get-draw-offset face active + step size ofs/2/x > size/x grid-offset/x]
 				;probe reduce [key "stp" step "act" active "gr" grid "ofs" get-draw-offset face active + step "tot" total/x "lp" last-page/x "cur" current/x]
@@ -1248,6 +1250,13 @@ tpl: [
 					either find event/flags 'shift [
 						mark-active/extend face active
 					][	mark-active face active]
+				]
+			][
+				switch key [
+					#"^M" [
+						unless tbl-editor [make-editor face]
+						show-editor face none active
+					]
 				]
 			]
 		]
