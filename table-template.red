@@ -34,7 +34,9 @@ tpl: [
 			"Type"   ["integer!" integer! "float!" float! "percent!" percent! "string!" string! "block!" block! "date!" date! "time!" time!]
 		]
 		"Selection" [
-			"Copy" copy-selection
+			"Copy"  copy-selection
+			"Cut"   cut-selection
+			"Paste" paste-selection
 		]
 	]
 	actors: [
@@ -64,6 +66,8 @@ tpl: [
 		frozen-rows: make block! 20
 		draw-block:  make block! 1000
 		filter-cmd:  make block! 10
+		selection-data: make block! 10000
+		selection-figure: make block! 10
 		
 		set-border: function [face ofs dim][
 			ofs: ofs/:dim
@@ -995,17 +999,60 @@ tpl: [
 			sz * dir
 		]
 
-		copy-selection: function [face][
-			out: copy []
+		copy-selection: function [face /cut][
+			clear head selection-data
+			clear selection-figure
+			clpbrd: copy ""
 			parse face/selected [any [
-			s: pair! '- pair! ()
-			|  pair! (
-				row: s/1/y
-				col: s/1/x
-				if face/options/auto-index [col: col - 1]
-				append out either all [face/options/auto-index col = 0][s/1/y][data/:row/:col]
-			)
+				s: pair! '- pair! (
+					mn: min s/1 s/3
+					mx: max s/1 s/3
+					append selection-figure fig: mx - mn + 1
+					repeat row fig/y [
+						repeat col fig/x [
+							if face/options/auto-index [col: col - 1]
+							d: mn - 1 + as-pair col row
+							append/only selection-data out: either all [face/options/auto-index d/x = 0][d/y][data/(d/y)/(d/x)]
+							repend clpbrd [mold out tab]
+							if cut [data/(d/y)/(d/x): copy ""]
+						]
+						change back tail clpbrd lf
+					]
+				)
+				|  pair! (
+					row: s/1/y
+					col: s/1/x
+					if face/options/auto-index [col: col - 1]
+					append selection-data out: either all [face/options/auto-index col = 0][s/1/y][data/:row/:col]
+					repend clpbrd [mold out tab]
+					if cut [data/:row/:col: copy ""]
+					append selection-figure 1x1
+				)
 			]]
+			remove back tail clpbrd
+			write-clipboard clpbrd
+			if cut [fill face]
+		]
+		
+		paste-selection: function [face /extern selection-data][
+			start: -1 + get-logic-address face anchor
+			if face/options/auto-index [start/x: start/x - 1]
+			probe selection-data: head selection-data
+			probe selection-figure
+			case [
+				single? face/selected [
+					foreach fig selection-figure [
+						repeat row fig/y [
+							repeat col fig/x [
+								d: first selection-data
+								data/(start/y + row)/(start/x + col): d
+								selection-data: next selection-data
+							]
+						]
+					]
+				]
+			]
+			fill face
 		]
 
 		; Standard
@@ -1367,7 +1414,9 @@ tpl: [
 					]
 				]
 				
-				copy-selection [copy-selection face]
+				copy-selection  [copy-selection face]
+				cut-selection   [copy-selection/cut face]
+				paste-selection [paste-selection face]
 				
 				integer! float! percent! string! block! date! time! [
 					col: get-col-number face event
