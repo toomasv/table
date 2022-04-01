@@ -1035,7 +1035,9 @@ tpl: [
 		on-wheel: function [face event][;May-be switch shift and ctrl ?
 			dim: pick [x y] event/shift?
 			steps: to-integer -1 * event/picked * either event/ctrl? [grid/:dim][select [x 1 y 3] dim]
-			scroll2 face dim steps
+			step: scroll2 face dim steps
+			move-anchor dim 0 - step
+			adjust-marks face
 		]
 
 		on-down: func [face event /local cell][
@@ -1209,7 +1211,6 @@ tpl: [
 							][	mark-active face active]
 						]
 					][
-						;if find event/flags 'shift [extend?: true]
 						if event/shift? [extend?: true]
 						;probe reduce [pos1 pos2  pos2 - pos1  "step" step  step * absolute pos2 - pos1 "cell" cell step * cell extend?]
 						;step: step * absolute pos2 - pos1
