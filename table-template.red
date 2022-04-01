@@ -37,6 +37,7 @@ tpl: [
 			"Copy"  copy-selection
 			"Cut"   cut-selection
 			"Paste" paste-selection
+			"Transpose" transpose
 		]
 	]
 	actors: [
@@ -1034,16 +1035,16 @@ tpl: [
 			if cut [fill face]
 		]
 		
-		paste-selection: function [face /extern selection-data][
+		paste-selection: function [face /transpose /extern selection-data][
 			start: -1 + get-logic-address face anchor
 			if face/options/auto-index [start/x: start/x - 1]
-			probe selection-data: head selection-data
-			probe selection-figure
+			selection-data: head selection-data
 			case [
 				single? face/selected [
+					dim: pick [[y x] [x y]] transpose
 					foreach fig selection-figure [
-						repeat row fig/y [
-							repeat col fig/x [
+						repeat row fig/(dim/2) [
+							repeat col fig/(dim/1) [
 								d: first selection-data
 								data/(start/y + row)/(start/x + col): d
 								selection-data: next selection-data
@@ -1051,6 +1052,7 @@ tpl: [
 						]
 					]
 				]
+				
 			]
 			fill face
 		]
@@ -1417,6 +1419,7 @@ tpl: [
 				copy-selection  [copy-selection face]
 				cut-selection   [copy-selection/cut face]
 				paste-selection [paste-selection face]
+				transpose       [paste-selection/transpose face]
 				
 				integer! float! percent! string! block! date! time! [
 					col: get-col-number face event
