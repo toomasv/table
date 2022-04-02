@@ -182,7 +182,8 @@ tpl: [
 			either col <= frozen/x [
 				frozen-col/:col
 			][
-				col - frozen/x + current/x
+				c: col - frozen/x + current/x
+				;col-index/:c
 			]
 		]
 
@@ -439,7 +440,8 @@ tpl: [
 				frozen?: i <= frozen/y
 				r: get-data-row face i
 				row: face/draw/:i
-				either r <= total/y [
+				probe reduce [r total/y]
+				;either r <= total/y [
 					unless block? row [
 						insert/only at face/draw i row: copy [] 
 						self/marks: next marks
@@ -457,11 +459,11 @@ tpl: [
 					set-cells face row r j py0 py1 frozen?
 					grid/y: j
 					py0: py1
-				][
-					either all [block? row block? row/1 row/1/6/y < self/size/y] [
-						foreach cell row [fix-cell-outside cell 'y]
-					][break]
-				]
+				;][
+				;	either all [block? row block? row/1 row/1/6/y < self/size/y] [
+				;		foreach cell row [fix-cell-outside cell 'y]
+				;	][break]
+				;]
 			]
 			while [all [block? row: face/draw/(i: i + 1) row/1/6/y < size/y]][
 				foreach cell row [fix-cell-outside cell 'y]
@@ -820,6 +822,7 @@ tpl: [
 			append clear row-index filtered
 			set-last-page
 			adjust-scroller face
+			unmark-active face
 			fill face
 		]
 
@@ -947,9 +950,9 @@ tpl: [
 
 		adjust-scroller: func [face /only][
 			unless only [set-grid face]
-			scroller/y/max-size:  max 1 length? row-index 
+			scroller/y/max-size:  max 1 total/y: length? row-index 
 			scroller/y/page-size: min grid/y scroller/y/max-size
-			scroller/x/max-size:  max 1 length? col-index 
+			scroller/x/max-size:  max 1 total/x: length? col-index 
 			scroller/x/page-size: min grid/x scroller/x/max-size
 		]
 
