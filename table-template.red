@@ -37,7 +37,7 @@ tpl: [
 			"Freeze"        freeze-col
 			"Unfreeze"      unfreeze-col
 			"Default width" default-width
-			;"Edit ..."      edit-column
+			"Edit ..."      edit-column
 			"Type"   [
 				"integer!" integer! 
 				"float!"   float! 
@@ -179,12 +179,7 @@ tpl: [
 		
 		get-col-number: function [face event][ 
 			col: get-draw-col face event
-			either col <= frozen/x [
-				frozen-col/:col
-			][
-				c: col - frozen/x + current/x
-				;col-index/:c
-			]
+			get-data-col face col
 		]
 
 		get-data-address: function [face event /with cell][
@@ -199,11 +194,13 @@ tpl: [
 		]
 
 		get-data-col: function [face col][
-			either col <= frozen/x [
+			col: either col <= frozen/x [
 				frozen-cols/:col
 			][
 				col-index/(col - frozen/x + current/x)
 			]
+			if face/options/auto-index [col: col - 1]
+			col
 		]
 
 		get-data-row: function [face row][
@@ -440,31 +437,24 @@ tpl: [
 				frozen?: i <= frozen/y
 				r: get-data-row face i
 				row: face/draw/:i
-				probe reduce [r total/y]
-				;either r <= total/y [
-					unless block? row [
-						insert/only at face/draw i row: copy [] 
-						self/marks: next marks
-						self/last-mark: next last-mark
-					]
-					sy: get-size 'y r
-					py1: py0 + sy
-					px0: 0
-					repeat c frozen/x [
-						x: frozen-cols/:c
-						px0: set-cell face row x r i c px0 py0 py1 true
-					]
-					row: at row frozen/x + 1
-					j: i - frozen/y
-					set-cells face row r j py0 py1 frozen?
-					grid/y: j
-					py0: py1
-				;][
-				;	either all [block? row block? row/1 row/1/6/y < self/size/y] [
-				;		foreach cell row [fix-cell-outside cell 'y]
-				;	][break]
-				;]
-			]
+				unless block? row [
+					insert/only at face/draw i row: copy [] 
+					self/marks: next marks
+					self/last-mark: next last-mark
+				]
+				sy: get-size 'y r
+				py1: py0 + sy
+				px0: 0
+				repeat c frozen/x [
+					x: frozen-cols/:c
+					px0: set-cell face row x r i c px0 py0 py1 true
+				]
+				row: at row frozen/x + 1
+				j: i - frozen/y
+				set-cells face row r j py0 py1 frozen?
+				grid/y: j
+				py0: py1
+			]                                                                                                                                                     
 			while [all [block? row: face/draw/(i: i + 1) row/1/6/y < size/y]][
 				foreach cell row [fix-cell-outside cell 'y]
 			]
@@ -581,6 +571,20 @@ tpl: [
 			win/selected:         tbl-editor
 		]
 
+		edit-column: function [face event][
+			if code: ask-code [
+				code: load code 
+				code: back insert next code '_
+				col: get-col-number face event
+				if not all [face/options/auto-index col = 0][
+					foreach row at data top/y + 1 [
+						change code row/:col
+						row/:col: do head code
+					]
+					fill face
+				]
+			]
+		]
 		; MARKS
 		
 		add-mark: func [face ofs][
@@ -1441,16 +1445,7 @@ tpl: [
 					fill face
 				]
 				
-				edit-column [
-					if code: ask-code [
-						code: load code 
-						col: get-col-number face event
-						if not all [face/options/auto-index col = 1][
-							foreach row data [parse row/:col code]
-							fill face
-						]
-					]
-				]
+				edit-column [edit-column face event]
 				
 				copy-selection  [copy-selection face]
 				cut-selection   [copy-selection/cut face]
